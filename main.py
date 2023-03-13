@@ -1,11 +1,14 @@
-import numpy as np
-import cv2
-from faster_rcnn_wrapper import FasterRCNNSlim
-from _tf_compat_import import compat_tensorflow as tf
 import argparse
-import os
 import json
+import os
+import pathlib
 import time
+
+import cv2
+import numpy as np
+
+from _tf_compat_import import compat_tensorflow as tf
+from faster_rcnn_wrapper import FasterRCNNSlim
 from nms_wrapper import NMSType, NMSWrapper
 
 
@@ -93,7 +96,7 @@ def main():
     parser.add_argument('-nms-type', help='Type of nms', choices=['PY_NMS', 'CPU_NMS', 'GPU_NMS'], dest='nms_type',
                         default='CPU_NMS')
     parser.add_argument('-crop-location', help='The output folder to place the cropped images', dest='crop_output_image_location')
-    parser.add_argument('-start-output', help='Start the numbering of the cropped images filename', dest='start_output_number', 
+    parser.add_argument('-start-output', help='Start the numbering of the cropped images filename', dest='start_output_number',
                         default=0, type=int)
     parser.add_argument('-crop-width', help='The width of images to crop', dest='crop_width', type=int)
     parser.add_argument('-crop-height', help='The height of images to crop', dest='crop_height', type=int)
@@ -156,22 +159,34 @@ def main():
                           'bbox': [x1, y1, x2, y2]}
             result[file].append(new_result)
 
+            wight = abs(x1 - x2)
+            height = abs(y1 - y2)
+
+            grow_left = wight * .5
+            # the fox ear is sort of long....
+            grow_up = height * .9
+            grow_right = wight * .5
+            grow_down = wight * .25
+
+            new_x1 = max(x1 - grow_left, 0)
+            new_y1 = max(y1 - grow_up, 0)
+            new_x2 = min(x2 + grow_right, img.shape[0])
+            new_y2 = min(y2 + grow_down, img.shape[1])
+
             if args.output is None and args.crop_output_image_location is None:
-                cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                cv2.rectangle(img, (int(new_x1), int(new_y1)), (int(new_x2), int(new_y2)), (0, 0, 255), 2)
 
             if args.crop_output_image_location:
-                cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
+                cropped_image = img[int(new_y1):int(new_y2), int(new_x1):int(new_x2)]
 
                 if args.crop_width and args.crop_height:
-                    cropped_image = cv2.resize(cropped_image, 
-                                              (args.crop_width, args.crop_height), 
-                                              interpolation = cv2.INTER_AREA)
+                    cropped_image = cv2.resize(cropped_image, (args.crop_width, args.crop_height), interpolation=cv2.INTER_AREA)
 
-                cv2.imwrite(args.crop_output_image_location + str(args.start_output_number) + ".jpg", cropped_image)
+                cv2.imwrite(str(pathlib.PurePath(args.crop_output_image_location, f"{args.start_output_number}.jpg")), cropped_image)
                 args.start_output_number += 1
 
         if args.output:
-            if ((idx+1) % 1000) == 0:
+            if ((idx + 1) % 1000) == 0:
                 # saving the temporary result
                 with open(args.output, 'w') as f:
                     json.dump(result, f)

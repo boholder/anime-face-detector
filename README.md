@@ -1,3 +1,5 @@
+Minor modification to the logic corresponding to the `-crop-location` parameter so that it can crop a customizable range of size.
+
 # Anime-Face-Detector
 A Faster-RCNN based anime face detector.
 
